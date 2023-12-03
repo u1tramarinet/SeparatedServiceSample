@@ -1,26 +1,19 @@
-package com.u1tramarinet.separatedservicesample.service
+package com.u1tramarinet.separatedservicesample.lib
 
 import android.app.Service
 import android.content.Intent
-import android.os.Binder
 import android.os.IBinder
 import android.os.Process
 import android.util.Log
 import kotlin.random.Random
 
-class SeparatedService : Service() {
+class RemoteSeparatedService : Service() {
     companion object {
-        private val TAG = SeparatedService::class.java.simpleName
+        private val TAG = RemoteSeparatedService::class.java.simpleName
     }
 
-    private val binder = LocalBinder()
-    private val generator = Random(1L)
-
-    val randomNumber: Int
-        get() {
-            Log.d(TAG, "get randomNumber")
-            return generator.nextInt()
-        }
+    private val binder = RemoteBinder()
+    private val generator = Random(2L)
 
     override fun onCreate() {
         super.onCreate()
@@ -37,7 +30,10 @@ class SeparatedService : Service() {
         return super.onUnbind(intent)
     }
 
-    inner class LocalBinder : Binder() {
-        fun getService(): SeparatedService = this@SeparatedService
+    inner class RemoteBinder : IRemoteSeparatedService.Stub() {
+        override fun getRandomNumber(): Int {
+            Log.d(TAG, "get randomNumber")
+            return generator.nextInt()
+        }
     }
 }

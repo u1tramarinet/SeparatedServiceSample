@@ -1,4 +1,4 @@
-package com.u1tramarinet.separatedservicesample.service
+package com.u1tramarinet.separatedservicesample.lib
 
 import android.content.ComponentName
 import android.content.Context
@@ -10,29 +10,31 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import java.lang.ref.WeakReference
 
-class SeparatedServiceManager(
+class RemoteSeparatedServiceManager(
     context: Context,
     finishWhenOnStop: Boolean = false,
 ) {
     companion object {
-        private var TAG = SeparatedServiceManager::class.java.simpleName
+        private val TAG: String = RemoteSeparatedServiceManager::class.java.simpleName
     }
 
-    private var separatedService: SeparatedService? = null
+    private var remoteSeparatedService: IRemoteSeparatedService? = null
     private var bound: Boolean = false
     private val contextRef: WeakReference<Context>
     private val connection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
-            Log.d(TAG, "onServiceConnected($name, $service)")
-            val binder = service as SeparatedService.LocalBinder
-            separatedService = binder.getService()
+            Log.d(
+                TAG,
+                "onServiceConnected($name, $service)"
+            )
+            remoteSeparatedService = IRemoteSeparatedService.Stub.asInterface(service)
             bound = true
         }
 
         override fun onServiceDisconnected(name: ComponentName?) {
             Log.d(TAG, "onServiceDisconnected($name)")
             bound = false
-            separatedService = null
+            remoteSeparatedService = null
             doBindIfAvailable()
         }
     }
@@ -66,10 +68,10 @@ class SeparatedServiceManager(
 
     fun getRandomNumber(): Int {
         Log.d(TAG, "getRandomNumber()")
-        if (!bound || separatedService == null) {
+        if (!bound || remoteSeparatedService == null) {
             return 0
         }
-        return separatedService?.randomNumber ?: 0
+        return remoteSeparatedService?.randomNumber ?: 0
     }
 
     fun finish() {
@@ -86,7 +88,7 @@ class SeparatedServiceManager(
         val context: Context? = contextRef.get()
         if (context != null) {
             Log.d(TAG, "bindService()")
-            Intent(context, SeparatedService::class.java).also { intent ->
+            Intent(context, RemoteSeparatedService::class.java).also { intent ->
                 context.bindService(intent, connection, Context.BIND_AUTO_CREATE)
             }
         }

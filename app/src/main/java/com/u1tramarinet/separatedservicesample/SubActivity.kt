@@ -17,11 +17,13 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.u1tramarinet.separatedservicesample.lib.RemoteSeparatedServiceManager
 import com.u1tramarinet.separatedservicesample.service.SeparatedServiceManager
 import com.u1tramarinet.separatedservicesample.ui.theme.SeparatedServiceSampleTheme
 
 class SubActivity : ComponentActivity() {
     private var manager: SeparatedServiceManager? = null
+    private var remoteManager: RemoteSeparatedServiceManager? = null
     override fun onCreate(savedInstanceState: Bundle?) {
         Log.d(SubActivity::class.java.simpleName, "onCreate()")
         super.onCreate(savedInstanceState)
@@ -43,18 +45,21 @@ class SubActivity : ComponentActivity() {
         Log.d(SubActivity::class.java.simpleName, "onStart()")
         super.onStart()
         manager = SeparatedServiceManager(this, true)
+        remoteManager = RemoteSeparatedServiceManager(this, true)
     }
 
     override fun onStop() {
         Log.d(SubActivity::class.java.simpleName, "onStop()")
         super.onStop()
         manager = null
+        remoteManager = null
     }
 
     private fun getRandomNumber() {
         val number = manager?.getRandomNumber() ?: -1
-        Log.d(SubActivity::class.java.simpleName, "random number=$number")
-        Toast.makeText(this, "Got random number: $number", Toast.LENGTH_SHORT).show()
+        val remoteNumber = remoteManager?.getRandomNumber() ?: -1
+        Log.d(SubActivity::class.java.simpleName, "random number=$number, random number(remote)=$remoteNumber")
+        Toast.makeText(this, "Got random number: $number/$remoteNumber", Toast.LENGTH_SHORT).show()
     }
 }
 
