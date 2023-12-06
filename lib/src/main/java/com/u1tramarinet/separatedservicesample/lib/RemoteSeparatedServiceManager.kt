@@ -20,6 +20,7 @@ class RemoteSeparatedServiceManager(
 
     private var remoteSeparatedService: IRemoteSeparatedService? = null
     private var bound: Boolean = false
+    private var disconnecting: Boolean = false
     private val contextRef: WeakReference<Context>
     private val connection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
@@ -29,13 +30,21 @@ class RemoteSeparatedServiceManager(
             )
             remoteSeparatedService = IRemoteSeparatedService.Stub.asInterface(service)
             bound = true
+            if (pendingCallbacks.isNotEmpty()) {
+                pendingCallbacks.forEach { callback ->
+                    registerCallback(callback)
+                }
+            }
         }
 
         override fun onServiceDisconnected(name: ComponentName?) {
             Log.d(TAG, "onServiceDisconnected($name)")
             bound = false
             remoteSeparatedService = null
-            doBindIfAvailable()
+            if (!disconnecting) {
+                doBindIfAvailable()
+                registerCallbacks()
+            }
         }
     }
     private val lifecycleObserver = object : DefaultLifecycleObserver {
@@ -48,9 +57,11 @@ class RemoteSeparatedServiceManager(
         override fun onStop(owner: LifecycleOwner) {
             Log.d(TAG, "onStop(owner=$owner)")
             super.onStop(owner)
-            finish()
+            disconnect()
         }
     }
+    private val callbackMap: MutableMap<Callback, ICallback.Stub> = mutableMapOf()
+    private val pendingCallbacks: MutableSet<Callback> = mutableSetOf()
 
     init {
         Log.d(TAG, "context=$context, finishWhenOnStop=$finishWhenOnStop")
@@ -74,13 +85,43 @@ class RemoteSeparatedServiceManager(
         return remoteSeparatedService?.randomNumber ?: 0
     }
 
-    fun finish() {
-        Log.d(TAG, "finish()")
+    fun disconnect() {
+        Log.d(TAG, "disconnect()")
+        if (disconnecting) return
         val context: Context? = contextRef.get()
         if (context != null) {
             Log.d(TAG, "unbindService()")
             context.unbindService(connection)
+            disconnecting = true
         }
+    }
+
+    fun registerCallback(callback: Callback) {
+        Log.d(TAG, "registerCallback($callback)")
+        if (callbackMap.containsKey(callback)) {
+            return
+        }
+        if (remoteSeparatedService != null) {
+            val callbackToService = wrapCallback(callback)
+            remoteSeparatedService?.registerCallback(callbackToService)
+            callbackMap[callback] = callbackToService
+            if (pendingCallbacks.contains(callback)) {
+                pendingCallbacks.remove(callback)
+            }
+        } else {
+            pendingCallbacks.add(callback)
+        }
+    }
+
+    fun unregisterCallback(callback: Callback) {
+        Log.d(TAG, "unregisterCallback($callback)")
+        val callbackToService = callbackMap[callback] ?: return
+        remoteSeparatedService?.unregisterCallback(callbackToService)
+        callbackMap.remove(callback)
+    }
+
+    private fun registerCallbacks() {
+        callbackMap.forEach { (_, callback) -> remoteSeparatedService?.registerCallback(callback) }
     }
 
     private fun doBindIfAvailable() {
@@ -92,5 +133,18 @@ class RemoteSeparatedServiceManager(
                 context.bindService(intent, connection, Context.BIND_AUTO_CREATE)
             }
         }
+    }
+
+    private fun wrapCallback(internal: Callback): ICallback.Stub {
+        return object : ICallback.Stub() {
+            override fun onEvent(message: String?) {
+                Log.d(TAG, "onEvent($message)")
+                internal.onEvent(message ?: "")
+            }
+        }
+    }
+
+    interface Callback {
+        fun onEvent(message: String)
     }
 }

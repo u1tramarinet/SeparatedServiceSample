@@ -24,6 +24,11 @@ import com.u1tramarinet.separatedservicesample.ui.theme.SeparatedServiceSampleTh
 class SubActivity : ComponentActivity() {
     private var manager: SeparatedServiceManager? = null
     private var remoteManager: RemoteSeparatedServiceManager? = null
+    private var callback = object : RemoteSeparatedServiceManager.Callback {
+        override fun onEvent(message: String) {
+            Log.d(SubActivity::class.java.simpleName, "onEvent($message)")
+        }
+    }
     override fun onCreate(savedInstanceState: Bundle?) {
         Log.d(SubActivity::class.java.simpleName, "onCreate()")
         super.onCreate(savedInstanceState)
@@ -46,19 +51,24 @@ class SubActivity : ComponentActivity() {
         super.onStart()
         manager = SeparatedServiceManager(this, true)
         remoteManager = RemoteSeparatedServiceManager(this, true)
+        remoteManager?.registerCallback(callback = callback)
     }
 
     override fun onStop() {
         Log.d(SubActivity::class.java.simpleName, "onStop()")
         super.onStop()
         manager = null
+        remoteManager?.unregisterCallback(callback)
         remoteManager = null
     }
 
     private fun getRandomNumber() {
         val number = manager?.getRandomNumber() ?: -1
         val remoteNumber = remoteManager?.getRandomNumber() ?: -1
-        Log.d(SubActivity::class.java.simpleName, "random number=$number, random number(remote)=$remoteNumber")
+        Log.d(
+            SubActivity::class.java.simpleName,
+            "random number=$number, random number(remote)=$remoteNumber"
+        )
         Toast.makeText(this, "Got random number: $number/$remoteNumber", Toast.LENGTH_SHORT).show()
     }
 }
